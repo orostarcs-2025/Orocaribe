@@ -58,10 +58,7 @@ module.exports = async function handler(req, res) {
   const mimeType = body.mimeType || 'image/jpeg';
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-  const prompt = `Analyze this image and respond with a single JSON object (no markdown, no code fence) with exactly these keys:
-- object_detected: short name of the main object (e.g. "gold ring", "silver necklace").
-- short_description: one short sentence describing the object.
-- estimated_material: one of gold, silver, gemstone, platinum, mixed, or other if not clearly identifiable.`;
+  const prompt = `Identify the object in this image. If it is jewelry, estimate the material (gold, silver, gemstone). Provide a short description. Respond with a single JSON object (no markdown, no code fence) with exactly these keys: object_detected (short name of the object), estimated_material (gold, silver, gemstone, or other), short_description (one short sentence).`;
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
