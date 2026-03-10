@@ -1,0 +1,667 @@
+<!-- FORMULARIO TASADOR IA - ORO CARIBE -->
+
+<style>
+  .orocaribe-form * {
+    box-sizing: border-box;
+  }
+
+  .orocaribe-form {
+    padding: 60px 20px;
+    background: #f8f9fa;
+  }
+
+  .orocaribe-form-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .form-card {
+    background: white;
+    border-radius: 12px;
+    padding: 50px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-main-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #1a2942;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .title-line {
+    width: 80px;
+    height: 4px;
+    background: #daa520;
+    margin: 0 auto 20px;
+  }
+
+  .form-subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+    font-size: 1.1rem;
+  }
+
+  /* Escaneo de Joya */
+  .scan-section {
+    margin-bottom: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, rgba(26, 41, 66, 0.04) 0%, rgba(218, 165, 32, 0.06) 100%);
+    border-radius: 12px;
+    border: 2px dashed #daa520;
+  }
+
+  .scan-section-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1a2942;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .scan-section-title svg {
+    width: 28px;
+    height: 28px;
+    fill: #daa520;
+  }
+
+  .scan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .scan-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #daa520 0%, #f0c040 100%);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(218, 165, 32, 0.3);
+  }
+
+  .scan-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(218, 165, 32, 0.4);
+  }
+
+  .scan-btn.secondary {
+    background: linear-gradient(135deg, #1a2942 0%, #2c3e50 100%);
+    box-shadow: 0 4px 15px rgba(26, 41, 66, 0.3);
+  }
+
+  .scan-btn.secondary:hover {
+    box-shadow: 0 6px 20px rgba(26, 41, 66, 0.4);
+  }
+
+  .scan-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: white;
+  }
+
+  .scan-btn input[type="file"] {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    cursor: pointer;
+  }
+
+  .scan-preview-wrap {
+    margin-top: 20px;
+    text-align: center;
+  }
+
+  .scan-preview {
+    max-width: 280px;
+    max-height: 280px;
+    margin: 0 auto 15px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    display: none;
+  }
+
+  .scan-preview.visible {
+    display: block;
+  }
+
+  .scan-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .analyze-btn {
+    margin-top: 15px;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, #1a2942 0%, #2c3e50 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 5px 20px rgba(26, 41, 66, 0.3);
+  }
+
+  .analyze-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(26, 41, 66, 0.4);
+  }
+
+  .analyze-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .ia-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(26, 41, 66, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .ia-loading-overlay.visible {
+    display: flex;
+  }
+
+  .ia-loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(218, 165, 32, 0.3);
+    border-top-color: #daa520;
+    border-radius: 50%;
+    animation: ia-spin 0.9s linear infinite;
+  }
+
+  .ia-loading-text {
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 0 20px;
+  }
+
+  @keyframes ia-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .ia-filled-badge {
+    display: inline-block;
+    background: rgba(218, 165, 32, 0.2);
+    color: #1a2942;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-left: 8px;
+  }
+
+  .form-section {
+    margin-bottom: 40px;
+  }
+
+  .section-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1a2942;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .form-grid.full {
+    grid-template-columns: 1fr;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .form-input,
+  .form-select,
+  .form-textarea {
+    padding: 14px 16px;
+    border: 2px solid #e5e5e5;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s;
+    font-family: inherit;
+  }
+
+  .form-input:focus,
+  .form-select:focus,
+  .form-textarea:focus {
+    outline: none;
+    border-color: #daa520;
+    box-shadow: 0 0 0 3px rgba(218, 165, 32, 0.1);
+  }
+
+  .form-textarea {
+    resize: vertical;
+    min-height: 120px;
+  }
+
+  .submit-button {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(135deg, #1a2942 0%, #2c3e50 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 20px;
+    box-shadow: 0 5px 20px rgba(26, 41, 66, 0.3);
+  }
+
+  .submit-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(26, 41, 66, 0.5);
+  }
+
+  .privacy-notice {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+  }
+
+  .privacy-notice a {
+    color: #daa520;
+    text-decoration: none;
+  }
+
+  .privacy-notice a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 768px) {
+    .form-card {
+      padding: 30px 20px;
+    }
+    .form-main-title {
+      font-size: 2rem;
+    }
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+    .scan-actions {
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .form-main-title {
+      font-size: 1.8rem;
+    }
+  }
+</style>
+
+<!-- HTML del Formulario. Para cambiar API Key o WhatsApp, edita data-api-key y data-whatsapp en la etiqueta section -->
+<section class="orocaribe-form" id="orocaribe-tazador" data-api-key="AIzaSyCLitgNCvpne4Vd0x70HvHfIT6L3aELPS0" data-whatsapp="18495071819">
+  <div class="orocaribe-form-container">
+    <div class="form-card">
+
+      <h2 class="form-main-title">VENDE TU JOYA</h2>
+      <div class="title-line"></div>
+      <p class="form-subtitle">Realiza tu cotización y en tu visita podemos maximizarlo</p>
+
+      <!-- Escaneo de Joya -->
+      <div class="scan-section">
+        <h3 class="scan-section-title">
+          <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          Escaneo de Joya
+        </h3>
+        <p style="color:#666; margin-bottom:15px; font-size:0.95rem;">Sube o toma una foto de tu joya para que la IA sugiera tipo, quilates y estado. Podrás corregir los datos antes de enviar.</p>
+        <div class="scan-actions">
+          <label class="scan-btn" style="position:relative;">
+            <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+            Subir foto
+            <input type="file" id="scanFile" accept="image/*" />
+          </label>
+          <label class="scan-btn secondary" style="position:relative;">
+            <svg viewBox="0 0 24 24"><path d="M12 12m-3.2 0a3.2 3.2 0 1 0 6.4 0 3.2 3.2 0 1 0-6.4 0"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+            Tomar foto
+            <input type="file" id="scanCamera" accept="image/*" capture="environment" />
+          </label>
+        </div>
+        <div class="scan-preview-wrap">
+          <div class="scan-preview" id="scanPreview">
+            <img id="scanPreviewImg" src="" alt="Vista previa" />
+          </div>
+          <button type="button" class="analyze-btn" id="analyzeBtn" disabled>Analizar con IA</button>
+        </div>
+      </div>
+
+      <div class="ia-loading-overlay" id="iaLoading">
+        <div class="ia-loading-spinner"></div>
+        <p class="ia-loading-text">Analizando detalles con Inteligencia Artificial...</p>
+      </div>
+
+      <form id="formCotizar" onsubmit="enviarTasacion(event)">
+        <!-- Contacto -->
+        <div class="form-section">
+          <h3 class="section-title">Contacto</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Tipo de Identificación</label>
+              <select class="form-select" id="tipoId" required>
+                <option value="">Seleccionar</option>
+                <option value="Cédula">Cédula</option>
+                <option value="Pasaporte">Pasaporte</option>
+                <option value="RNC">RNC</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Identificación</label>
+              <input type="text" class="form-input" id="identificacion" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nombres</label>
+              <input type="text" class="form-input" id="nombres" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Apellidos</label>
+              <input type="text" class="form-input" id="apellidos" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input type="tel" class="form-input" id="telefono" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Correo</label>
+              <input type="email" class="form-input" id="correo" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ciudad</label>
+              <input type="text" class="form-input" id="ciudad" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Datos del Artículo -->
+        <div class="form-section">
+          <h3 class="section-title">Datos del Artículo <span class="ia-filled-badge" id="iaBadge" style="display:none;">Completado por IA (puedes editar)</span></h3>
+          <div class="form-grid full">
+            <div class="form-group">
+              <label class="form-label">Tipo de Joya</label>
+              <select class="form-select" id="tipoJoya" required>
+                <option value="">Seleccionar</option>
+                <option value="Anillo">Anillo</option>
+                <option value="Cadena">Cadena</option>
+                <option value="Pulsera">Pulsera</option>
+                <option value="Aretes">Aretes</option>
+                <option value="Dije">Dije</option>
+                <option value="Reloj">Reloj</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Descripción</label>
+              <textarea class="form-textarea" id="descripcion" placeholder="Color del metal y detalles (se puede completar con la IA)"></textarea>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select class="form-select" id="estado" required>
+                <option value="">Seleccionar</option>
+                <option value="Nuevo">Nuevo</option>
+                <option value="Excelente">Excelente</option>
+                <option value="Bueno">Bueno</option>
+                <option value="Regular">Regular</option>
+                <option value="Para fundir">Para fundir</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kilates</label>
+              <select class="form-select" id="kilates" required>
+                <option value="">Seleccionar</option>
+                <option value="10k">10k</option>
+                <option value="14k Nacional">14k Nacional</option>
+                <option value="14k Italiano">14k Italiano</option>
+                <option value="18k Nacional">18k Nacional</option>
+                <option value="18k Italiano">18k Italiano</option>
+                <option value="22k">22k</option>
+                <option value="24k">24k</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gramos</label>
+              <input type="number" class="form-input" id="gramos" step="0.1" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio Esperado</label>
+              <input type="text" class="form-input" id="precioEsperado" />
+            </div>
+          </div>
+        </div>
+
+        <div class="privacy-notice">
+          Condiciones de uso y aviso de privacidad. <a href="#">Ver</a>
+        </div>
+
+        <button type="submit" class="submit-button">Enviar Tasación</button>
+      </form>
+
+    </div>
+  </div>
+</section>
+
+<script>
+// Variables globales
+let imagenEscaneoBase64 = null;
+let imagenEscaneoMime = 'image/jpeg';
+
+function getSectionData() {
+  var sec = document.getElementById('orocaribe-tazador');
+  if (!sec) return { apiKey: '', whatsapp: '18495071819' };
+  return {
+    apiKey: (sec.getAttribute('data-api-key') || '').trim(),
+    whatsapp: (sec.getAttribute('data-whatsapp') || '18495071819').trim()
+  };
+}
+
+function setScanImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  imagenEscaneoMime = file.type;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    imagenEscaneoBase64 = e.target.result.split(',')[1];
+    document.getElementById('scanPreviewImg').src = e.target.result;
+    document.getElementById('scanPreview').classList.add('visible');
+    var data = getSectionData();
+    document.getElementById('analyzeBtn').disabled = !data.apiKey;
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('scanFile').onchange = function() { setScanImage(this.files[0]); };
+document.getElementById('scanCamera').onchange = function() { setScanImage(this.files[0]); };
+
+function normalizeQuilates(val) {
+  if (!val) return '';
+  var v = (val + '').toLowerCase().replace(/\s/g, ' ');
+  var map = { '10k': '10k', '14k nacional': '14k Nacional', '14k italiano': '14k Italiano', '18k nacional': '18k Nacional', '18k italiano': '18k Italiano', '22k': '22k', '24k': '24k' };
+  return map[v] || val;
+}
+
+function normalizeEstado(val) {
+  if (!val) return '';
+  var v = (val + '').toLowerCase();
+  var opts = ['Nuevo', 'Excelente', 'Bueno', 'Regular', 'Para fundir'];
+  for (var i = 0; i < opts.length; i++) {
+    if (opts[i].toLowerCase() === v) return opts[i];
+  }
+  if (/excelente/i.test(v)) return 'Excelente';
+  if (/bueno/i.test(v)) return 'Bueno';
+  if (/regular/i.test(v)) return 'Regular';
+  if (/fundir/i.test(v)) return 'Para fundir';
+  if (/nuevo/i.test(v)) return 'Nuevo';
+  return val;
+}
+
+function normalizeTipoJoya(val) {
+  if (!val) return '';
+  var v = (val + '').toLowerCase();
+  var opts = ['Anillo', 'Cadena', 'Pulsera', 'Aretes', 'Dije', 'Reloj', 'Otro'];
+  for (var i = 0; i < opts.length; i++) {
+    if (opts[i].toLowerCase() === v) return opts[i];
+  }
+  if (/anillo/i.test(v)) return 'Anillo';
+  if (/cadena/i.test(v)) return 'Cadena';
+  if (/pulsera/i.test(v)) return 'Pulsera';
+  if (/arete/i.test(v)) return 'Aretes';
+  if (/dije/i.test(v)) return 'Dije';
+  if (/reloj/i.test(v)) return 'Reloj';
+  return 'Otro';
+}
+
+function analizarConIA() {
+  var data = getSectionData();
+  if (!imagenEscaneoBase64 || !data.apiKey) return;
+  document.getElementById('iaLoading').classList.add('visible');
+  document.getElementById('analyzeBtn').disabled = true;
+  var promptText = 'Eres un experto tasador de joyeria. Analiza la imagen y responde SOLO un JSON (sin markdown, sin texto extra) con estas claves: tipoJoya (Anillo, Cadena, Pulsera, Aretes, Dije, Reloj, Otro), colorMetal (Oro amarillo, Oro blanco, Oro rosa, Plata), quilates (10k, 14k Nacional, 14k Italiano, 18k Nacional, 18k Italiano, 22k, 24k), estado (Nuevo, Excelente, Bueno, Regular, Para fundir), descripcionBreve (frase corta). Analiza esta imagen y devuelve únicamente el JSON.';
+  var body = {
+    contents: [
+      {
+        parts: [
+          { text: promptText },
+          { inline_data: { mime_type: imagenEscaneoMime, data: imagenEscaneoBase64 } }
+        ]
+      }
+    ],
+    generation_config: { temperature: 0.2, max_output_tokens: 512 }
+  };
+  function llamarAPI(url) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function(res) {
+        return res.text().then(function(txt) {
+          var data;
+          try { data = JSON.parse(txt); } catch (e) { return Promise.reject(new Error('Respuesta inválida')); }
+          if (!res.ok) {
+            var msg = (data.error && data.error.message) ? data.error.message : res.status + ' ' + res.statusText;
+            return Promise.reject(new Error(msg));
+          }
+          if (data.error && data.error.message) return Promise.reject(new Error(data.error.message));
+          return data;
+        });
+      });
+  }
+  function procesarRespuesta(data) {
+    var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : null;
+    if (!text) throw new Error('La IA no devolvió texto.');
+    var json = {};
+    try { json = JSON.parse(text.trim()); } catch (e) {
+      var m = text.match(/\{[\s\S]*\}/);
+      if (m) json = JSON.parse(m[0]);
+    }
+    var tipoJoya = normalizeTipoJoya(json.tipoJoya);
+    var estado = normalizeEstado(json.estado);
+    var kilates = normalizeQuilates(json.quilates);
+    var desc = (json.descripcionBreve || '') + (json.colorMetal ? ' | ' + json.colorMetal : '');
+    if (tipoJoya) document.getElementById('tipoJoya').value = tipoJoya;
+    if (estado) document.getElementById('estado').value = estado;
+    if (kilates) document.getElementById('kilates').value = kilates;
+    if (desc) document.getElementById('descripcion').value = desc.trim();
+    var badge = document.getElementById('iaBadge');
+    if (badge) badge.style.display = 'inline-block';
+  }
+  var url1 = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(data.apiKey);
+  var url2 = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=' + encodeURIComponent(data.apiKey);
+  llamarAPI(url1)
+    .then(procesarRespuesta)
+    .catch(function(err) {
+      var msg = err && err.message ? err.message : '';
+      if (msg.indexOf('not found') !== -1 || msg.indexOf('quota') !== -1 || msg.indexOf('429') !== -1) {
+        return llamarAPI(url2).then(procesarRespuesta);
+      }
+      throw err;
+    })
+    .catch(function(err) {
+      console.error('Error tasador IA:', err);
+      var msg = err && err.message ? err.message : 'Error desconocido';
+      if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
+        msg = 'Error de red o CORS. La API de Google Gemini puede no permitir llamadas desde el navegador.';
+      }
+      alert('No se pudo analizar la imagen.\n\n' + msg + '\n\nPuedes llenar el formulario manualmente.');
+    })
+    .finally(function() {
+      document.getElementById('iaLoading').classList.remove('visible');
+      document.getElementById('analyzeBtn').disabled = false;
+    });
+}
+
+document.getElementById('analyzeBtn').onclick = analizarConIA;
+
+function enviarTasacion(e) {
+  e.preventDefault();
+  var data = getSectionData();
+  var nombre = (document.getElementById('nombres').value + ' ' + document.getElementById('apellidos').value).trim();
+  var tipo = document.getElementById('tipoJoya').value || 'No indicado';
+  var metal = (document.getElementById('descripcion').value || 'No indicado').replace(/\n/g, ' ');
+  var quilates = document.getElementById('kilates').value || 'No indicado';
+  var estado = document.getElementById('estado').value || 'No indicado';
+  var peso = document.getElementById('gramos').value || '—';
+  var msg = 'Hola Oro Caribe, mi nombre es ' + nombre + '. Me gustaría tasar una joya con las siguientes características detectadas por su IA:\n\n';
+  msg += 'Tipo: ' + tipo + '\n\n';
+  msg += 'Metal: ' + metal + '\n\n';
+  msg += 'Quilates: ' + quilates + '\n\n';
+  msg += 'Estado: ' + estado + '\n\n';
+  msg += 'Peso estimado: ' + peso + ' g\n\n';
+  msg += '¿Podrían darme una valoración preliminar?\n\n';
+  if (imagenEscaneoBase64) {
+    msg += '📎 *Envío la foto de mi joya en el siguiente mensaje.*';
+  }
+  var waUrl = 'https://api.whatsapp.com/send/?phone=' + data.whatsapp + '&text=' + encodeURIComponent(msg) + '&type=phone_number&app_absent=0';
+  window.open(waUrl, '_blank');
+  if (imagenEscaneoBase64) {
+    alert('Se abrió WhatsApp con tu mensaje. Por favor envía la foto de tu joya en el chat: pulsa el botón de adjuntar (📎) y envía la imagen que subiste para tasar.');
+  }
+}
+</script>
