@@ -1,12 +1,24 @@
 /**
  * Vercel Serverless API: POST /api/identify
- * Receives a base64 image, sends it to Google Gemini Vision (1.5 Flash), returns object description.
+ * Recibe imagen base64 desde Shopify, llama a Gemini, devuelve campos del formulario tasador.
  * Env: GEMINI_API_KEY
  */
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const MODEL = 'gemini-2.0-flash';
+
+const PROMPT = `Eres un experto tasador de joyería para Oro Caribe (República Dominicana).
+Analiza la imagen y responde ÚNICAMENTE con un JSON válido, sin markdown ni texto adicional.
+Claves requeridas (usa cadena vacía si no puedes determinarlo):
+  tipoJoya           — Anillo, Cadena, Pulsera, Aretes, Dije, Reloj u Otro
+  colorMetal         — Oro amarillo, Oro blanco, Oro rosa, Plata u Otro
+  quilates           — 10k, 14k Nacional, 14k Italiano, 18k Nacional, 18k Italiano, 22k o 24k
+  estado             — Nuevo, Excelente, Bueno, Regular o Para fundir
+  desperfectos       — daños visibles o "Ninguno visible"
+  descripcionPedreria — piedras o decoraciones visibles o "Sin pedrería"
+  descripcionBreve   — una frase descriptiva completa de la pieza
+Devuelve SOLO el objeto JSON.`;
 
 function parseJsonFromText(text) {
   if (!text || typeof text !== 'string') return null;
@@ -23,6 +35,14 @@ function parseJsonFromText(text) {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed. Use POST.' });
@@ -58,51 +78,34 @@ module.exports = async function handler(req, res) {
   const mimeType = body.mimeType || 'image/jpeg';
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-  const prompt = `Identify the object in this image. If it is jewelry, estimate the material (gold, silver, gemstone). Provide a short description. Respond with a single JSON object (no markdown, no code fence) with exactly these keys: object_detected (short name of the object), estimated_material (gold, silver, gemstone, or other), short_description (one short sentence).`;
-
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL });
 
-    const imagePart = {
-      inlineData: {
-        mimeType,
-        data: base64Data,
-      },
-    };
-
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 256,
-      },
+      contents: [{ role: 'user', parts: [
+        { inlineData: { mimeType, data: base64Data } },
+        { text: PROMPT }
+      ]}],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 600 },
     });
 
     const response = result.response;
     const text = response && (typeof response.text === 'function' ? response.text() : response.text);
     if (!text) {
-      res.status(502).json({
-        error: 'No analysis result',
-        message: 'Gemini did not return a valid response.',
-      });
+      res.status(502).json({ error: 'No analysis result', message: 'Gemini no devolvió respuesta.' });
       return;
     }
 
     const parsed = parseJsonFromText(text);
     if (!parsed) {
-      res.status(502).json({
-        error: 'Invalid analysis format',
-        message: 'Could not parse structured response.',
-      });
+      res.status(502).json({ error: 'Invalid analysis format', message: 'No se pudo interpretar la respuesta.' });
       return;
     }
 
-    const out = {
-      object_detected: parsed.object_detected != null ? String(parsed.object_detected).trim() : '',
-      estimated_material: parsed.estimated_material != null ? String(parsed.estimated_material).trim().toLowerCase() : 'other',
-      short_description: parsed.short_description != null ? String(parsed.short_description).trim() : '',
-    };
+    const fields = ['tipoJoya','colorMetal','quilates','estado','desperfectos','descripcionPedreria','descripcionBreve'];
+    const out = {};
+    fields.forEach(k => { out[k] = parsed[k] != null ? String(parsed[k]).trim() : ''; });
 
     res.status(200).json(out);
   } catch (err) {
