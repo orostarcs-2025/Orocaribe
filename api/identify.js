@@ -6,7 +6,7 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const MODEL = 'gemini-1.5-flash';
+const MODEL = 'gemini-2.0-flash';
 
 function parseJsonFromText(text) {
   if (!text || typeof text !== 'string') return null;

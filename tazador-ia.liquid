@@ -341,7 +341,7 @@
   }
 </style>
 
-<!-- HTML del Formulario. Para cambiar API Key o WhatsApp, edita data-api-key y data-whatsapp en la etiqueta section -->
+<!-- Formulario Tasador: edita data-api-key con tu Google Gemini API Key y data-whatsapp con tu número. -->
 <section class="orocaribe-form" id="orocaribe-tazador" data-api-key="AIzaSyCLitgNCvpne4Vd0x70HvHfIT6L3aELPS0" data-whatsapp="18495071819">
   <div class="orocaribe-form-container">
     <div class="form-card">
@@ -493,19 +493,27 @@
 </section>
 
 <script>
-// Variables globales
-let imagenEscaneoBase64 = null;
-let imagenEscaneoMime = 'image/jpeg';
+// ── Estado global ─────────────────────────────────────────────────────────────
+var imagenEscaneoBase64 = null;
+var imagenEscaneoMime   = 'image/jpeg';
+
+// ── Modelos Gemini actuales (orden de preferencia) ────────────────────────────
+// gemini-1.5-flash-8b fue retirado; usar solo estos:
+var MODELOS = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash'
+];
 
 function getSectionData() {
   var sec = document.getElementById('orocaribe-tazador');
   if (!sec) return { apiKey: '', whatsapp: '18495071819' };
   return {
-    apiKey: (sec.getAttribute('data-api-key') || '').trim(),
-    whatsapp: (sec.getAttribute('data-whatsapp') || '18495071819').trim()
+    apiKey:    (sec.getAttribute('data-api-key')  || '').trim(),
+    whatsapp:  (sec.getAttribute('data-whatsapp') || '18495071819').trim()
   };
 }
 
+// ── Imagen ────────────────────────────────────────────────────────────────────
 function setScanImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   imagenEscaneoMime = file.type;
@@ -514,122 +522,167 @@ function setScanImage(file) {
     imagenEscaneoBase64 = e.target.result.split(',')[1];
     document.getElementById('scanPreviewImg').src = e.target.result;
     document.getElementById('scanPreview').classList.add('visible');
-    var data = getSectionData();
-    document.getElementById('analyzeBtn').disabled = !data.apiKey;
+    document.getElementById('analyzeBtn').disabled = !getSectionData().apiKey;
   };
   reader.readAsDataURL(file);
 }
 
-document.getElementById('scanFile').onchange = function() { setScanImage(this.files[0]); };
+document.getElementById('scanFile').onchange   = function() { setScanImage(this.files[0]); };
 document.getElementById('scanCamera').onchange = function() { setScanImage(this.files[0]); };
 
+// ── Normalización ─────────────────────────────────────────────────────────────
 function normalizeQuilates(val) {
   if (!val) return '';
-  var v = (val + '').toLowerCase().replace(/\s/g, ' ');
-  var map = { '10k': '10k', '14k nacional': '14k Nacional', '14k italiano': '14k Italiano', '18k nacional': '18k Nacional', '18k italiano': '18k Italiano', '22k': '22k', '24k': '24k' };
+  var v = (val + '').toLowerCase().replace(/\s+/g, ' ').trim();
+  var map = {
+    '10k': '10k', '10 k': '10k',
+    '14k nacional': '14k Nacional', '14k italiano': '14k Italiano',
+    '18k nacional': '18k Nacional', '18k italiano': '18k Italiano', '750': '18k Italiano',
+    '22k': '22k', '24k': '24k'
+  };
   return map[v] || val;
 }
 
 function normalizeEstado(val) {
   if (!val) return '';
   var v = (val + '').toLowerCase();
-  var opts = ['Nuevo', 'Excelente', 'Bueno', 'Regular', 'Para fundir'];
-  for (var i = 0; i < opts.length; i++) {
-    if (opts[i].toLowerCase() === v) return opts[i];
-  }
-  if (/excelente/i.test(v)) return 'Excelente';
-  if (/bueno/i.test(v)) return 'Bueno';
-  if (/regular/i.test(v)) return 'Regular';
-  if (/fundir/i.test(v)) return 'Para fundir';
-  if (/nuevo/i.test(v)) return 'Nuevo';
+  if (/excelente|excellent/i.test(v)) return 'Excelente';
+  if (/bueno|good/i.test(v))          return 'Bueno';
+  if (/regular/i.test(v))             return 'Regular';
+  if (/fundir|fundicion/i.test(v))    return 'Para fundir';
+  if (/nuevo|new/i.test(v))           return 'Nuevo';
   return val;
 }
 
 function normalizeTipoJoya(val) {
   if (!val) return '';
   var v = (val + '').toLowerCase();
-  var opts = ['Anillo', 'Cadena', 'Pulsera', 'Aretes', 'Dije', 'Reloj', 'Otro'];
-  for (var i = 0; i < opts.length; i++) {
-    if (opts[i].toLowerCase() === v) return opts[i];
-  }
-  if (/anillo/i.test(v)) return 'Anillo';
-  if (/cadena/i.test(v)) return 'Cadena';
-  if (/pulsera/i.test(v)) return 'Pulsera';
-  if (/arete/i.test(v)) return 'Aretes';
-  if (/dije/i.test(v)) return 'Dije';
-  if (/reloj/i.test(v)) return 'Reloj';
+  if (/anillo|ring/i.test(v))              return 'Anillo';
+  if (/cadena|chain/i.test(v))             return 'Cadena';
+  if (/pulsera|bracelet/i.test(v))         return 'Pulsera';
+  if (/arete|aretes|pendiente|earring/i.test(v)) return 'Aretes';
+  if (/dije|charm|pendant/i.test(v))       return 'Dije';
+  if (/reloj|watch/i.test(v))              return 'Reloj';
   return 'Otro';
 }
 
+// ── Llamada a Gemini (directo desde navegador) ────────────────────────────────
+var PROMPT_IA = [
+  'Eres un experto tasador de joyería para Oro Caribe (República Dominicana).',
+  'Analiza la imagen y responde ÚNICAMENTE con un JSON válido, sin markdown ni texto adicional.',
+  'Claves requeridas:',
+  '  tipoJoya          — Anillo, Cadena, Pulsera, Aretes, Dije, Reloj u Otro',
+  '  colorMetal        — Oro amarillo, Oro blanco, Oro rosa, Plata u Otro',
+  '  quilates          — 10k, 14k Nacional, 14k Italiano, 18k Nacional, 18k Italiano, 22k o 24k',
+  '  estado            — Nuevo, Excelente, Bueno, Regular o Para fundir',
+  '  desperfectos      — daños visibles o "Ninguno visible"',
+  '  descripcionPedreria — piedras o decoraciones visibles o "Sin pedrería"',
+  '  descripcionBreve  — una frase descriptiva de la pieza',
+  'Devuelve SOLO el objeto JSON.'
+].join('\n');
+
+function llamarGemini(apiKey, modelo) {
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+            modelo + ':generateContent?key=' + encodeURIComponent(apiKey);
+  var body = {
+    contents: [{
+      parts: [
+        { text: PROMPT_IA },
+        { inline_data: { mime_type: imagenEscaneoMime, data: imagenEscaneoBase64 } }
+      ]
+    }],
+    generation_config: { temperature: 0.2, max_output_tokens: 600 }
+  };
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(res) {
+    return res.text().then(function(txt) {
+      var d;
+      try { d = JSON.parse(txt); } catch(e) { throw new Error('Respuesta inválida del servidor'); }
+      if (!res.ok) {
+        var msg = (d.error && d.error.message) ? d.error.message : (res.status + ' ' + res.statusText);
+        throw new Error(msg);
+      }
+      if (d.error && d.error.message) throw new Error(d.error.message);
+      return d;
+    });
+  });
+}
+
+// Intenta modelos en orden hasta que uno funcione
+function llamarConFallback(apiKey, modelos, indice) {
+  indice = indice || 0;
+  if (indice >= modelos.length) return Promise.reject(new Error('Todos los modelos fallaron.'));
+  return llamarGemini(apiKey, modelos[indice]).catch(function(err) {
+    var msg = err && err.message ? err.message : '';
+    // Reintentar si el modelo no está disponible o hay cuota agotada
+    if (/not found|quota|429|unavailable|deprecated/i.test(msg)) {
+      return llamarConFallback(apiKey, modelos, indice + 1);
+    }
+    throw err;
+  });
+}
+
+function procesarRespuestaIA(data) {
+  var text = data.candidates &&
+             data.candidates[0] &&
+             data.candidates[0].content &&
+             data.candidates[0].content.parts &&
+             data.candidates[0].content.parts[0]
+             ? data.candidates[0].content.parts[0].text : null;
+  if (!text) throw new Error('La IA no devolvió texto.');
+
+  var json = {};
+  try { json = JSON.parse(text.trim()); }
+  catch(e) {
+    var m = text.match(/\{[\s\S]*\}/);
+    if (m) json = JSON.parse(m[0]);
+    else throw new Error('No se encontró JSON en la respuesta de la IA.');
+  }
+
+  // Auto-rellenar: tipo, descripción y estado (kilates lo elige el cliente)
+  var tipoJoya = normalizeTipoJoya(json.tipoJoya);
+  var estado   = normalizeEstado(json.estado);
+
+  var partes = [];
+  if (json.descripcionBreve) partes.push(json.descripcionBreve);
+  if (json.colorMetal)       partes.push('Metal: ' + json.colorMetal);
+  if (json.descripcionPedreria && json.descripcionPedreria !== 'Sin pedrería')
+    partes.push('Pedrería: ' + json.descripcionPedreria);
+  if (json.desperfectos && json.desperfectos !== 'Ninguno visible')
+    partes.push('Desperfectos: ' + json.desperfectos);
+  var desc = partes.join(' | ');
+
+  if (tipoJoya) document.getElementById('tipoJoya').value   = tipoJoya;
+  if (estado)   document.getElementById('estado').value     = estado;
+  if (desc)     document.getElementById('descripcion').value = desc;
+
+  var badge = document.getElementById('iaBadge');
+  if (badge) badge.style.display = 'inline-block';
+}
+
 function analizarConIA() {
-  var data = getSectionData();
-  if (!imagenEscaneoBase64 || !data.apiKey) return;
+  var cfg = getSectionData();
+  if (!imagenEscaneoBase64) return;
+  if (!cfg.apiKey) {
+    alert('Configura tu Google Gemini API Key en el atributo data-api-key de la sección.');
+    return;
+  }
+
   document.getElementById('iaLoading').classList.add('visible');
   document.getElementById('analyzeBtn').disabled = true;
-  var promptText = 'Eres un experto tasador de joyeria. Analiza la imagen y responde SOLO un JSON (sin markdown, sin texto extra) con estas claves: tipoJoya (Anillo, Cadena, Pulsera, Aretes, Dije, Reloj, Otro), colorMetal (Oro amarillo, Oro blanco, Oro rosa, Plata), quilates (10k, 14k Nacional, 14k Italiano, 18k Nacional, 18k Italiano, 22k, 24k), estado (Nuevo, Excelente, Bueno, Regular, Para fundir), descripcionBreve (frase corta). Analiza esta imagen y devuelve únicamente el JSON.';
-  var body = {
-    contents: [
-      {
-        parts: [
-          { text: promptText },
-          { inline_data: { mime_type: imagenEscaneoMime, data: imagenEscaneoBase64 } }
-        ]
-      }
-    ],
-    generation_config: { temperature: 0.2, max_output_tokens: 512 }
-  };
-  function llamarAPI(url) {
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function(res) {
-        return res.text().then(function(txt) {
-          var data;
-          try { data = JSON.parse(txt); } catch (e) { return Promise.reject(new Error('Respuesta inválida')); }
-          if (!res.ok) {
-            var msg = (data.error && data.error.message) ? data.error.message : res.status + ' ' + res.statusText;
-            return Promise.reject(new Error(msg));
-          }
-          if (data.error && data.error.message) return Promise.reject(new Error(data.error.message));
-          return data;
-        });
-      });
-  }
-  function procesarRespuesta(data) {
-    var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : null;
-    if (!text) throw new Error('La IA no devolvió texto.');
-    var json = {};
-    try { json = JSON.parse(text.trim()); } catch (e) {
-      var m = text.match(/\{[\s\S]*\}/);
-      if (m) json = JSON.parse(m[0]);
-    }
-    var tipoJoya = normalizeTipoJoya(json.tipoJoya);
-    var estado = normalizeEstado(json.estado);
-    var kilates = normalizeQuilates(json.quilates);
-    var desc = (json.descripcionBreve || '') + (json.colorMetal ? ' | ' + json.colorMetal : '');
-    if (tipoJoya) document.getElementById('tipoJoya').value = tipoJoya;
-    if (estado) document.getElementById('estado').value = estado;
-    if (kilates) document.getElementById('kilates').value = kilates;
-    if (desc) document.getElementById('descripcion').value = desc.trim();
-    var badge = document.getElementById('iaBadge');
-    if (badge) badge.style.display = 'inline-block';
-  }
-  var url1 = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(data.apiKey);
-  var url2 = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=' + encodeURIComponent(data.apiKey);
-  llamarAPI(url1)
-    .then(procesarRespuesta)
-    .catch(function(err) {
-      var msg = err && err.message ? err.message : '';
-      if (msg.indexOf('not found') !== -1 || msg.indexOf('quota') !== -1 || msg.indexOf('429') !== -1) {
-        return llamarAPI(url2).then(procesarRespuesta);
-      }
-      throw err;
-    })
+
+  llamarConFallback(cfg.apiKey, MODELOS, 0)
+    .then(procesarRespuestaIA)
     .catch(function(err) {
       console.error('Error tasador IA:', err);
-      var msg = err && err.message ? err.message : 'Error desconocido';
-      if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
-        msg = 'Error de red o CORS. La API de Google Gemini puede no permitir llamadas desde el navegador.';
+      var msg = (err && err.message) ? err.message : 'Error desconocido';
+      if (/Failed to fetch|NetworkError|CORS/i.test(msg)) {
+        msg = 'Error de red. Verifica tu conexión a internet.';
       }
-      alert('No se pudo analizar la imagen.\n\n' + msg + '\n\nPuedes llenar el formulario manualmente.');
+      alert('No se pudo analizar la imagen.\n\n' + msg + '\n\nPuedes completar el formulario manualmente.');
     })
     .finally(function() {
       document.getElementById('iaLoading').classList.remove('visible');
@@ -639,29 +692,49 @@ function analizarConIA() {
 
 document.getElementById('analyzeBtn').onclick = analizarConIA;
 
+// ── WhatsApp ──────────────────────────────────────────────────────────────────
 function enviarTasacion(e) {
   e.preventDefault();
-  var data = getSectionData();
-  var nombre = (document.getElementById('nombres').value + ' ' + document.getElementById('apellidos').value).trim();
-  var tipo = document.getElementById('tipoJoya').value || 'No indicado';
-  var metal = (document.getElementById('descripcion').value || 'No indicado').replace(/\n/g, ' ');
-  var quilates = document.getElementById('kilates').value || 'No indicado';
-  var estado = document.getElementById('estado').value || 'No indicado';
-  var peso = document.getElementById('gramos').value || '—';
-  var msg = 'Hola Oro Caribe, mi nombre es ' + nombre + '. Me gustaría tasar una joya con las siguientes características detectadas por su IA:\n\n';
-  msg += 'Tipo: ' + tipo + '\n\n';
-  msg += 'Metal: ' + metal + '\n\n';
-  msg += 'Quilates: ' + quilates + '\n\n';
-  msg += 'Estado: ' + estado + '\n\n';
-  msg += 'Peso estimado: ' + peso + ' g\n\n';
-  msg += '¿Podrían darme una valoración preliminar?\n\n';
-  if (imagenEscaneoBase64) {
-    msg += '📎 *Envío la foto de mi joya en el siguiente mensaje.*';
-  }
-  var waUrl = 'https://api.whatsapp.com/send/?phone=' + data.whatsapp + '&text=' + encodeURIComponent(msg) + '&type=phone_number&app_absent=0';
+  var cfg     = getSectionData();
+  var nombre  = (document.getElementById('nombres').value + ' ' + document.getElementById('apellidos').value).trim();
+  var tipoId  = document.getElementById('tipoId').value;
+  var idNum   = document.getElementById('identificacion').value;
+  var tel     = document.getElementById('telefono').value;
+  var correo  = document.getElementById('correo').value;
+  var ciudad  = document.getElementById('ciudad').value;
+  var tipo    = document.getElementById('tipoJoya').value    || 'No indicado';
+  var desc    = (document.getElementById('descripcion').value || 'No indicada').replace(/\n/g, ' ');
+  var estado  = document.getElementById('estado').value      || 'No indicado';
+  var kilates = document.getElementById('kilates').value     || 'No indicado';
+  var gramos  = document.getElementById('gramos').value      || '—';
+  var precio  = document.getElementById('precioEsperado').value || 'No indicado';
+
+  var msg = '🏅 *TASACIÓN DE JOYA — ORO CARIBE*\n\n';
+  msg += '📋 *DATOS DE CONTACTO*\n';
+  msg += '• Nombre: ' + nombre + '\n';
+  msg += '• ' + tipoId + ': ' + idNum + '\n';
+  msg += '• Teléfono: ' + tel + '\n';
+  msg += '• Correo: ' + correo + '\n';
+  msg += '• Ciudad: ' + ciudad + '\n\n';
+  msg += '💍 *ANÁLISIS DE LA JOYA (IA)*\n';
+  msg += '• Tipo: ' + tipo + '\n';
+  msg += '• Descripción/Pedrería: ' + desc + '\n';
+  msg += '• Estado: ' + estado + '\n\n';
+  msg += '⚖️ *DATOS DE PESO Y CALIDAD*\n';
+  msg += '• Kilates: ' + kilates + '\n';
+  msg += '• Gramos: ' + gramos + ' g\n';
+  msg += '• Precio esperado: ' + precio + '\n\n';
+  msg += imagenEscaneoBase64
+    ? '📎 _Envío la foto de mi joya en el siguiente mensaje._'
+    : '¿Podrían confirmar la cotización? Los espero en su local.';
+
+  var waUrl = 'https://api.whatsapp.com/send/?phone=' + cfg.whatsapp +
+              '&text=' + encodeURIComponent(msg) +
+              '&type=phone_number&app_absent=0';
   window.open(waUrl, '_blank');
+
   if (imagenEscaneoBase64) {
-    alert('Se abrió WhatsApp con tu mensaje. Por favor envía la foto de tu joya en el chat: pulsa el botón de adjuntar (📎) y envía la imagen que subiste para tasar.');
+    alert('WhatsApp abierto con tu tasación. Adjunta la foto de tu joya presionando el ícono 📎 antes de enviar.');
   }
 }
 </script>
