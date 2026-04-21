@@ -341,8 +341,8 @@
   }
 </style>
 
-<!-- Formulario Tasador: subir imagen → IA rellena formulario → usuario edita → enviar a WhatsApp. Configura data-vercel-url (tu API en Vercel) y data-whatsapp. -->
-<section class="orocaribe-form" id="orocaribe-tazador" data-vercel-url="https://TU-App.vercel.app" data-whatsapp="18495071819">
+<!-- Formulario Tasador: data-vercel-url = tu dominio Vercel, data-whatsapp = tu número con código de país. -->
+<section class="orocaribe-form" id="orocaribe-tazador" data-vercel-url="https://orocaribe-f1t2.vercel.app" data-whatsapp="18495071819">
   <div class="orocaribe-form-container">
     <div class="form-card">
 
@@ -493,19 +493,20 @@
 </section>
 
 <script>
-// Variables globales
-let imagenEscaneoBase64 = null;
-let imagenEscaneoMime = 'image/jpeg';
+// ── Estado global ─────────────────────────────────────────────────────────────
+var imagenEscaneoBase64 = null;
+var imagenEscaneoMime   = 'image/jpeg';
 
 function getSectionData() {
   var sec = document.getElementById('orocaribe-tazador');
   if (!sec) return { vercelUrl: '', whatsapp: '18495071819' };
   return {
     vercelUrl: (sec.getAttribute('data-vercel-url') || '').trim().replace(/\/$/, ''),
-    whatsapp: (sec.getAttribute('data-whatsapp') || '18495071819').trim()
+    whatsapp:  (sec.getAttribute('data-whatsapp')   || '18495071819').trim()
   };
 }
 
+// ── Imagen ────────────────────────────────────────────────────────────────────
 function setScanImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   imagenEscaneoMime = file.type;
@@ -514,63 +515,59 @@ function setScanImage(file) {
     imagenEscaneoBase64 = e.target.result.split(',')[1];
     document.getElementById('scanPreviewImg').src = e.target.result;
     document.getElementById('scanPreview').classList.add('visible');
-    var data = getSectionData();
-    document.getElementById('analyzeBtn').disabled = !data.vercelUrl;
+    document.getElementById('analyzeBtn').disabled = false;
   };
   reader.readAsDataURL(file);
 }
 
-document.getElementById('scanFile').onchange = function() { setScanImage(this.files[0]); };
+document.getElementById('scanFile').onchange   = function() { setScanImage(this.files[0]); };
 document.getElementById('scanCamera').onchange = function() { setScanImage(this.files[0]); };
 
+// ── Normalización ─────────────────────────────────────────────────────────────
 function normalizeQuilates(val) {
   if (!val) return '';
-  var v = (val + '').toLowerCase().replace(/\s/g, ' ');
-  var map = { '10k': '10k', '14k nacional': '14k Nacional', '14k italiano': '14k Italiano', '18k nacional': '18k Nacional', '18k italiano': '18k Italiano', '22k': '22k', '24k': '24k' };
+  var v = (val + '').toLowerCase().replace(/\s+/g, ' ').trim();
+  var map = {
+    '10k': '10k', '10 k': '10k',
+    '14k nacional': '14k Nacional', '14k italiano': '14k Italiano',
+    '18k nacional': '18k Nacional', '18k italiano': '18k Italiano', '750': '18k Italiano',
+    '22k': '22k', '24k': '24k'
+  };
   return map[v] || val;
 }
 
 function normalizeEstado(val) {
   if (!val) return '';
   var v = (val + '').toLowerCase();
-  var opts = ['Nuevo', 'Excelente', 'Bueno', 'Regular', 'Para fundir'];
-  for (var i = 0; i < opts.length; i++) {
-    if (opts[i].toLowerCase() === v) return opts[i];
-  }
-  if (/excelente/i.test(v)) return 'Excelente';
-  if (/bueno/i.test(v)) return 'Bueno';
-  if (/regular/i.test(v)) return 'Regular';
-  if (/fundir/i.test(v)) return 'Para fundir';
-  if (/nuevo/i.test(v)) return 'Nuevo';
+  if (/excelente|excellent/i.test(v)) return 'Excelente';
+  if (/bueno|good/i.test(v))          return 'Bueno';
+  if (/regular/i.test(v))             return 'Regular';
+  if (/fundir|fundicion/i.test(v))    return 'Para fundir';
+  if (/nuevo|new/i.test(v))           return 'Nuevo';
   return val;
 }
 
 function normalizeTipoJoya(val) {
   if (!val) return '';
   var v = (val + '').toLowerCase();
-  var opts = ['Anillo', 'Cadena', 'Pulsera', 'Aretes', 'Dije', 'Reloj', 'Otro'];
-  for (var i = 0; i < opts.length; i++) {
-    if (opts[i].toLowerCase() === v) return opts[i];
-  }
-  if (/anillo/i.test(v)) return 'Anillo';
-  if (/cadena/i.test(v)) return 'Cadena';
-  if (/pulsera/i.test(v)) return 'Pulsera';
-  if (/arete/i.test(v)) return 'Aretes';
-  if (/dije/i.test(v)) return 'Dije';
-  if (/reloj/i.test(v)) return 'Reloj';
+  if (/anillo|ring/i.test(v))                    return 'Anillo';
+  if (/cadena|chain/i.test(v))                   return 'Cadena';
+  if (/pulsera|bracelet/i.test(v))               return 'Pulsera';
+  if (/arete|aretes|pendiente|earring/i.test(v)) return 'Aretes';
+  if (/dije|charm|pendant/i.test(v))             return 'Dije';
+  if (/reloj|watch/i.test(v))                    return 'Reloj';
   return 'Otro';
 }
 
+// ── Llamada al backend de Vercel (evita bloqueos CSP de Shopify) ──────────────
 function analizarConIA() {
-  var data = getSectionData();
-  if (!imagenEscaneoBase64 || !data.vercelUrl) {
-    if (!data.vercelUrl) alert('Configura la URL de tu API en Vercel (data-vercel-url en la sección).');
-    return;
-  }
+  var cfg = getSectionData();
+  if (!imagenEscaneoBase64) return;
+
   document.getElementById('iaLoading').classList.add('visible');
   document.getElementById('analyzeBtn').disabled = true;
-  var url = data.vercelUrl + '/api/identify';
-  fetch(url, {
+
+  fetch(cfg.vercelUrl + '/api/identify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ image: imagenEscaneoBase64, mimeType: imagenEscaneoMime })
@@ -578,20 +575,30 @@ function analizarConIA() {
     .then(function(res) { return res.json(); })
     .then(function(json) {
       if (json.error) throw new Error(json.message || json.error);
+
       var tipoJoya = normalizeTipoJoya(json.tipoJoya);
-      var estado = normalizeEstado(json.estado);
-      var kilates = normalizeQuilates(json.quilates);
-      var desc = (json.descripcionBreve || '') + (json.colorMetal ? ' | ' + json.colorMetal : '');
-      if (tipoJoya) document.getElementById('tipoJoya').value = tipoJoya;
-      if (estado) document.getElementById('estado').value = estado;
-      if (kilates) document.getElementById('kilates').value = kilates;
-      if (desc) document.getElementById('descripcion').value = desc.trim();
+      var estado   = normalizeEstado(json.estado);
+      var kilates  = normalizeQuilates(json.quilates);
+
+      var partes = [];
+      if (json.descripcionBreve) partes.push(json.descripcionBreve);
+      if (json.colorMetal)       partes.push('Metal: ' + json.colorMetal);
+      if (json.descripcionPedreria && json.descripcionPedreria !== 'Sin pedrería')
+        partes.push('Pedrería: ' + json.descripcionPedreria);
+      if (json.desperfectos && json.desperfectos !== 'Ninguno visible')
+        partes.push('Desperfectos: ' + json.desperfectos);
+      var desc = partes.join(' | ');
+
+      if (tipoJoya) document.getElementById('tipoJoya').value    = tipoJoya;
+      if (estado)   document.getElementById('estado').value      = estado;
+      if (desc)     document.getElementById('descripcion').value  = desc;
+
       var badge = document.getElementById('iaBadge');
       if (badge) badge.style.display = 'inline-block';
     })
     .catch(function(err) {
       console.error('Error tasador IA:', err);
-      alert('No se pudo analizar la imagen.\n\n' + (err && err.message ? err.message : 'Revisa la URL de Vercel y que la API esté en marcha.') + '\n\nPuedes llenar el formulario manualmente.');
+      alert('No se pudo analizar la imagen.\n\n' + (err && err.message ? err.message : 'Error desconocido') + '\n\nPuedes completar el formulario manualmente.');
     })
     .finally(function() {
       document.getElementById('iaLoading').classList.remove('visible');
@@ -601,29 +608,49 @@ function analizarConIA() {
 
 document.getElementById('analyzeBtn').onclick = analizarConIA;
 
+// ── WhatsApp ──────────────────────────────────────────────────────────────────
 function enviarTasacion(e) {
   e.preventDefault();
-  var data = getSectionData();
-  var nombre = (document.getElementById('nombres').value + ' ' + document.getElementById('apellidos').value).trim();
-  var tipo = document.getElementById('tipoJoya').value || 'No indicado';
-  var metal = (document.getElementById('descripcion').value || 'No indicado').replace(/\n/g, ' ');
-  var quilates = document.getElementById('kilates').value || 'No indicado';
-  var estado = document.getElementById('estado').value || 'No indicado';
-  var peso = document.getElementById('gramos').value || '—';
-  var msg = 'Hola Oro Caribe, mi nombre es ' + nombre + '. Me gustaría tasar una joya con las siguientes características detectadas por su IA:\n\n';
-  msg += 'Tipo: ' + tipo + '\n\n';
-  msg += 'Metal: ' + metal + '\n\n';
-  msg += 'Quilates: ' + quilates + '\n\n';
-  msg += 'Estado: ' + estado + '\n\n';
-  msg += 'Peso estimado: ' + peso + ' g\n\n';
-  msg += '¿Podrían darme una valoración preliminar?\n\n';
-  if (imagenEscaneoBase64) {
-    msg += '📎 *Envío la foto de mi joya en el siguiente mensaje.*';
-  }
-  var waUrl = 'https://api.whatsapp.com/send/?phone=' + data.whatsapp + '&text=' + encodeURIComponent(msg) + '&type=phone_number&app_absent=0';
+  var cfg     = getSectionData();
+  var nombre  = (document.getElementById('nombres').value + ' ' + document.getElementById('apellidos').value).trim();
+  var tipoId  = document.getElementById('tipoId').value;
+  var idNum   = document.getElementById('identificacion').value;
+  var tel     = document.getElementById('telefono').value;
+  var correo  = document.getElementById('correo').value;
+  var ciudad  = document.getElementById('ciudad').value;
+  var tipo    = document.getElementById('tipoJoya').value    || 'No indicado';
+  var desc    = (document.getElementById('descripcion').value || 'No indicada').replace(/\n/g, ' ');
+  var estado  = document.getElementById('estado').value      || 'No indicado';
+  var kilates = document.getElementById('kilates').value     || 'No indicado';
+  var gramos  = document.getElementById('gramos').value      || '—';
+  var precio  = document.getElementById('precioEsperado').value || 'No indicado';
+
+  var msg = '🏅 *TASACIÓN DE JOYA — ORO CARIBE*\n\n';
+  msg += '📋 *DATOS DE CONTACTO*\n';
+  msg += '• Nombre: ' + nombre + '\n';
+  msg += '• ' + tipoId + ': ' + idNum + '\n';
+  msg += '• Teléfono: ' + tel + '\n';
+  msg += '• Correo: ' + correo + '\n';
+  msg += '• Ciudad: ' + ciudad + '\n\n';
+  msg += '💍 *ANÁLISIS DE LA JOYA (IA)*\n';
+  msg += '• Tipo: ' + tipo + '\n';
+  msg += '• Descripción/Pedrería: ' + desc + '\n';
+  msg += '• Estado: ' + estado + '\n\n';
+  msg += '⚖️ *DATOS DE PESO Y CALIDAD*\n';
+  msg += '• Kilates: ' + kilates + '\n';
+  msg += '• Gramos: ' + gramos + ' g\n';
+  msg += '• Precio esperado: ' + precio + '\n\n';
+  msg += imagenEscaneoBase64
+    ? '📎 _Envío la foto de mi joya en el siguiente mensaje._'
+    : '¿Podrían confirmar la cotización? Los espero en su local.';
+
+  var waUrl = 'https://api.whatsapp.com/send/?phone=' + cfg.whatsapp +
+              '&text=' + encodeURIComponent(msg) +
+              '&type=phone_number&app_absent=0';
   window.open(waUrl, '_blank');
+
   if (imagenEscaneoBase64) {
-    alert('Se abrió WhatsApp con tu mensaje. Por favor envía la foto de tu joya en el chat: pulsa el botón de adjuntar (📎) y envía la imagen que subiste para tasar.');
+    alert('WhatsApp abierto con tu tasación. Adjunta la foto de tu joya presionando el ícono 📎 antes de enviar.');
   }
 }
 </script>
