@@ -1,19 +1,9 @@
 {
-  "name": "jewelry-ai-api",
+  "name": "orocaribe-identify-api",
   "version": "1.0.0",
-  "description": "API endpoint for AI jewelry analysis using Google Gemini",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
+  "description": "API Vercel: analiza imagen de joya con Gemini y devuelve campos para el formulario tasador",
+  "engines": { "node": ">=18" },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
-    "cors": "^2.8.5",
-    "express": "^4.21.0",
-    "openai": "^4.73.0"
+    "@google/generative-ai": "^0.21.0"
   }
 }

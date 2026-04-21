@@ -1,12 +1,21 @@
 /**
  * Vercel Serverless API: POST /api/identify
- * Receives a base64 image, sends it to Google Gemini Vision (1.5 Flash), returns object description.
+ * Para el tasador Oro Caribe: recibe imagen base64, Gemini analiza la joya, devuelve campos del formulario.
  * Env: GEMINI_API_KEY
  */
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const MODEL = 'gemini-1.5-flash';
+
+const PROMPT = `Eres un experto tasador de joyería. Analiza la imagen y responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto extra) con estas claves:
+- tipoJoya: uno de Anillo, Cadena, Pulsera, Aretes, Dije, Reloj, Otro
+- colorMetal: Oro amarillo, Oro blanco, Oro rosa, Plata u otro
+- quilates: 10k, 14k Nacional, 14k Italiano, 18k Nacional, 18k Italiano, 22k, 24k (o el más parecido)
+- estado: Nuevo, Excelente, Bueno, Regular, Para fundir
+- descripcionBreve: una frase corta describiendo la pieza
+
+Responde solo el JSON.`;
 
 function parseJsonFromText(text) {
   if (!text || typeof text !== 'string') return null;
@@ -50,7 +59,7 @@ module.exports = async function handler(req, res) {
   if (!imageBase64) {
     res.status(400).json({
       error: 'Missing image',
-      message: 'Send a JSON body with an "image" field containing the base64-encoded image.',
+      message: 'Envía un body JSON con el campo "image" en base64.',
     });
     return;
   }
@@ -58,25 +67,19 @@ module.exports = async function handler(req, res) {
   const mimeType = body.mimeType || 'image/jpeg';
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-  const prompt = `Identify the object in this image. If it is jewelry, estimate the material (gold, silver, gemstone). Provide a short description. Respond with a single JSON object (no markdown, no code fence) with exactly these keys: object_detected (short name of the object), estimated_material (gold, silver, gemstone, or other), short_description (one short sentence).`;
-
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL });
 
-    const imagePart = {
-      inlineData: {
-        mimeType,
-        data: base64Data,
-      },
-    };
-
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 256,
-      },
+      contents: [{
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType, data: base64Data } },
+          { text: PROMPT },
+        ],
+      }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
     });
 
     const response = result.response;
@@ -84,7 +87,7 @@ module.exports = async function handler(req, res) {
     if (!text) {
       res.status(502).json({
         error: 'No analysis result',
-        message: 'Gemini did not return a valid response.',
+        message: 'Gemini no devolvió respuesta.',
       });
       return;
     }
@@ -93,15 +96,17 @@ module.exports = async function handler(req, res) {
     if (!parsed) {
       res.status(502).json({
         error: 'Invalid analysis format',
-        message: 'Could not parse structured response.',
+        message: 'No se pudo interpretar la respuesta.',
       });
       return;
     }
 
     const out = {
-      object_detected: parsed.object_detected != null ? String(parsed.object_detected).trim() : '',
-      estimated_material: parsed.estimated_material != null ? String(parsed.estimated_material).trim().toLowerCase() : 'other',
-      short_description: parsed.short_description != null ? String(parsed.short_description).trim() : '',
+      tipoJoya: parsed.tipoJoya != null ? String(parsed.tipoJoya).trim() : '',
+      colorMetal: parsed.colorMetal != null ? String(parsed.colorMetal).trim() : '',
+      quilates: parsed.quilates != null ? String(parsed.quilates).trim() : '',
+      estado: parsed.estado != null ? String(parsed.estado).trim() : '',
+      descripcionBreve: parsed.descripcionBreve != null ? String(parsed.descripcionBreve).trim() : '',
     };
 
     res.status(200).json(out);
@@ -109,7 +114,7 @@ module.exports = async function handler(req, res) {
     console.error('identify API error:', err.message);
     res.status(502).json({
       error: 'Analysis failed',
-      message: err.message || 'Could not analyze image.',
+      message: err.message || 'No se pudo analizar la imagen.',
     });
   }
 };

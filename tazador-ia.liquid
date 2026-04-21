@@ -341,8 +341,8 @@
   }
 </style>
 
-<!-- HTML del Formulario. Para cambiar API Key o WhatsApp, edita data-api-key y data-whatsapp en la etiqueta section -->
-<section class="orocaribe-form" id="orocaribe-tazador" data-api-key="AIzaSyCLitgNCvpne4Vd0x70HvHfIT6L3aELPS0" data-whatsapp="18495071819">
+<!-- Formulario Tasador: subir imagen → IA rellena formulario → usuario edita → enviar a WhatsApp. Configura data-vercel-url (tu API en Vercel) y data-whatsapp. -->
+<section class="orocaribe-form" id="orocaribe-tazador" data-vercel-url="https://TU-App.vercel.app" data-whatsapp="18495071819">
   <div class="orocaribe-form-container">
     <div class="form-card">
 
@@ -499,9 +499,9 @@ let imagenEscaneoMime = 'image/jpeg';
 
 function getSectionData() {
   var sec = document.getElementById('orocaribe-tazador');
-  if (!sec) return { apiKey: '', whatsapp: '18495071819' };
+  if (!sec) return { vercelUrl: '', whatsapp: '18495071819' };
   return {
-    apiKey: (sec.getAttribute('data-api-key') || '').trim(),
+    vercelUrl: (sec.getAttribute('data-vercel-url') || '').trim().replace(/\/$/, ''),
     whatsapp: (sec.getAttribute('data-whatsapp') || '18495071819').trim()
   };
 }
@@ -515,7 +515,7 @@ function setScanImage(file) {
     document.getElementById('scanPreviewImg').src = e.target.result;
     document.getElementById('scanPreview').classList.add('visible');
     var data = getSectionData();
-    document.getElementById('analyzeBtn').disabled = !data.apiKey;
+    document.getElementById('analyzeBtn').disabled = !data.vercelUrl;
   };
   reader.readAsDataURL(file);
 }
@@ -563,73 +563,35 @@ function normalizeTipoJoya(val) {
 
 function analizarConIA() {
   var data = getSectionData();
-  if (!imagenEscaneoBase64 || !data.apiKey) return;
+  if (!imagenEscaneoBase64 || !data.vercelUrl) {
+    if (!data.vercelUrl) alert('Configura la URL de tu API en Vercel (data-vercel-url en la sección).');
+    return;
+  }
   document.getElementById('iaLoading').classList.add('visible');
   document.getElementById('analyzeBtn').disabled = true;
-  var promptText = 'Eres un experto tasador de joyeria. Analiza la imagen y responde SOLO un JSON (sin markdown, sin texto extra) con estas claves: tipoJoya (Anillo, Cadena, Pulsera, Aretes, Dije, Reloj, Otro), colorMetal (Oro amarillo, Oro blanco, Oro rosa, Plata), quilates (10k, 14k Nacional, 14k Italiano, 18k Nacional, 18k Italiano, 22k, 24k), estado (Nuevo, Excelente, Bueno, Regular, Para fundir), descripcionBreve (frase corta). Analiza esta imagen y devuelve únicamente el JSON.';
-  var body = {
-    contents: [
-      {
-        parts: [
-          { text: promptText },
-          { inline_data: { mime_type: imagenEscaneoMime, data: imagenEscaneoBase64 } }
-        ]
-      }
-    ],
-    generation_config: { temperature: 0.2, max_output_tokens: 512 }
-  };
-  function llamarAPI(url) {
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function(res) {
-        return res.text().then(function(txt) {
-          var data;
-          try { data = JSON.parse(txt); } catch (e) { return Promise.reject(new Error('Respuesta inválida')); }
-          if (!res.ok) {
-            var msg = (data.error && data.error.message) ? data.error.message : res.status + ' ' + res.statusText;
-            return Promise.reject(new Error(msg));
-          }
-          if (data.error && data.error.message) return Promise.reject(new Error(data.error.message));
-          return data;
-        });
-      });
-  }
-  function procesarRespuesta(data) {
-    var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : null;
-    if (!text) throw new Error('La IA no devolvió texto.');
-    var json = {};
-    try { json = JSON.parse(text.trim()); } catch (e) {
-      var m = text.match(/\{[\s\S]*\}/);
-      if (m) json = JSON.parse(m[0]);
-    }
-    var tipoJoya = normalizeTipoJoya(json.tipoJoya);
-    var estado = normalizeEstado(json.estado);
-    var kilates = normalizeQuilates(json.quilates);
-    var desc = (json.descripcionBreve || '') + (json.colorMetal ? ' | ' + json.colorMetal : '');
-    if (tipoJoya) document.getElementById('tipoJoya').value = tipoJoya;
-    if (estado) document.getElementById('estado').value = estado;
-    if (kilates) document.getElementById('kilates').value = kilates;
-    if (desc) document.getElementById('descripcion').value = desc.trim();
-    var badge = document.getElementById('iaBadge');
-    if (badge) badge.style.display = 'inline-block';
-  }
-  var url1 = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(data.apiKey);
-  var url2 = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=' + encodeURIComponent(data.apiKey);
-  llamarAPI(url1)
-    .then(procesarRespuesta)
-    .catch(function(err) {
-      var msg = err && err.message ? err.message : '';
-      if (msg.indexOf('not found') !== -1 || msg.indexOf('quota') !== -1 || msg.indexOf('429') !== -1) {
-        return llamarAPI(url2).then(procesarRespuesta);
-      }
-      throw err;
+  var url = data.vercelUrl + '/api/identify';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: imagenEscaneoBase64, mimeType: imagenEscaneoMime })
+  })
+    .then(function(res) { return res.json(); })
+    .then(function(json) {
+      if (json.error) throw new Error(json.message || json.error);
+      var tipoJoya = normalizeTipoJoya(json.tipoJoya);
+      var estado = normalizeEstado(json.estado);
+      var kilates = normalizeQuilates(json.quilates);
+      var desc = (json.descripcionBreve || '') + (json.colorMetal ? ' | ' + json.colorMetal : '');
+      if (tipoJoya) document.getElementById('tipoJoya').value = tipoJoya;
+      if (estado) document.getElementById('estado').value = estado;
+      if (kilates) document.getElementById('kilates').value = kilates;
+      if (desc) document.getElementById('descripcion').value = desc.trim();
+      var badge = document.getElementById('iaBadge');
+      if (badge) badge.style.display = 'inline-block';
     })
     .catch(function(err) {
       console.error('Error tasador IA:', err);
-      var msg = err && err.message ? err.message : 'Error desconocido';
-      if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
-        msg = 'Error de red o CORS. La API de Google Gemini puede no permitir llamadas desde el navegador.';
-      }
-      alert('No se pudo analizar la imagen.\n\n' + msg + '\n\nPuedes llenar el formulario manualmente.');
+      alert('No se pudo analizar la imagen.\n\n' + (err && err.message ? err.message : 'Revisa la URL de Vercel y que la API esté en marcha.') + '\n\nPuedes llenar el formulario manualmente.');
     })
     .finally(function() {
       document.getElementById('iaLoading').classList.remove('visible');
