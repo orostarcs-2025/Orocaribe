@@ -91,8 +91,8 @@
       loadingOverlay.classList.add('visible');
       analyzeBtn.disabled = true;
       try {
-        var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + encodeURIComponent(apiKey);
-        var body = { systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents: [{ parts: [{ text: 'Analiza esta imagen de joyeria y devuelve el JSON con tipoJoya, colorMetal, quilates, estado y descripcionBreve.' }, { inlineData: { mimeType: imagenEscaneoMime, data: imagenEscaneoBase64 } }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 512, responseMimeType: 'application/json' } };
+        var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(apiKey);
+        var body = { contents: [{ parts: [{ text: SYSTEM_PROMPT }, { inlineData: { mimeType: imagenEscaneoMime, data: imagenEscaneoBase64 } }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 512 } };
         var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!res.ok) throw new Error('Error en la API');
         var data = await res.json();
